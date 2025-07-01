@@ -2,12 +2,21 @@ import tweepy
 import time
 import requests
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import logging
 import os
+import random
 
 # Dodane do obsługi uploadu grafiki
 from tweepy import OAuth1UserHandler, API
+
+# Dodane do generowania komentarzy AI
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+    logging.warning("OpenAI library not installed. AI comments will be disabled.")
 
 # Konfiguracja logowania
 logging.basicConfig(
@@ -21,6 +30,12 @@ api_key = os.getenv("TWITTER_API_KEY")
 api_secret = os.getenv("TWITTER_API_SECRET")
 access_token = os.getenv("BOT3_ACCESS_TOKEN")
 access_token_secret = os.getenv("BOT3_ACCESS_TOKEN_SECRET")
+
+# OpenAI API key
+openai_api_key = os.getenv("OPENAI_API_KEY")
+openai_client = None
+if openai_api_key and OPENAI_AVAILABLE:
+    openai_client = OpenAI(api_key=openai_api_key)
 
 # URL API outlight.fun - (1h timeframe)
 OUTLIGHT_API_URL = "https://outlight.fun/api/tokens/most-called?timeframe=1h"
@@ -54,7 +69,15 @@ def get_top_tokens():
 
 def format_main_tweet(top_3_tokens):
     """Format tweet with top 3 tokens."""
-    tweet = f"🚀Top 5 Most 📞 1h\n\n"
+    # Randomizuj intro
+    intros = [
+        "🚀Top 5 Most 📞 1h\n\n",
+        "🔥Hottest calls last hour\n\n", 
+        "📈Most called tokens (1h)\n\n",
+        "🎯Top performers - 1h calls\n\n"
+    ]
+    tweet = random.choice(intros)
+    
     medals = ['🥇', '🥈', '🥉']
     for i, token in enumerate(top_3_tokens, 0):
         calls = token.get('filtered_calls', 0)
@@ -84,13 +107,80 @@ def format_reply_tweet(continuation_tokens):
             tweet += f"{address}\n"
             tweet += f"📞 {calls}\n\n"
     
+    # Randomizuj hashtagi
+    hashtag_sets = [
+        "#SOL #Outlight #TokenCalls",
+        "#Solana #DeFi #CryptoAnalysis", 
+        "#SOL #Crypto #Signals",
+        "#SolanaEcosystem #TokenTracking #DeFi"
+    ]
+    selected_hashtags = random.choice(hashtag_sets)
+    
     # Zawsze dodaj link i hashtagi na końcu
-    tweet += "\ud83e\uddea Data from: \ud83d\udd17 https://outlight.fun/\n#SOL #Outlight #TokenCalls "
+    tweet += f"\ud83e\uddea Data from: \ud83d\udd17 https://outlight.fun/\n{selected_hashtags} "
     return tweet.strip()
 
+def generate_ai_comment(top_tokens):
+    """Generuje losowy komentarz AI na temat top tokenów"""
+    if not openai_api_key or not OPENAI_AVAILABLE or not openai_client:
+        # Fallback - predefiniowane komentarze
+        fallback_comments = [
+            f"🔥 {top_tokens[0]['symbol']} leading with {top_tokens[0]['filtered_calls']} calls! The market speaks volumes 📊",
+            f"Interesting pattern: ${top_tokens[0]['symbol']} and ${top_tokens[1]['symbol']} dominating today's calls 🤔",
+            f"💡 Pro tip: When you see {top_tokens[0]['filtered_calls']} calls on ${top_tokens[0]['symbol']}, smart money is moving!",
+            f"🎯 ${top_tokens[0]['symbol']} with {top_tokens[0]['filtered_calls']} calls - that's what momentum looks like! #SolanaGems"
+        ]
+        return random.choice(fallback_comments)
+    
+    try:
+        # Przygotuj kontekst dla AI
+        token_info = []
+        for i, token in enumerate(top_tokens[:3]):
+            symbol = token.get('symbol', 'Unknown')
+            calls = token.get('filtered_calls', 0)
+            token_info.append(f"{i+1}. ${symbol} ({calls} calls)")
+        
+        context = "\\n".join(token_info)
+        
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {
+                    "role": "system", 
+                    "content": "You are a crypto analyst writing short, engaging Twitter comments about trending Solana tokens. Keep it under 200 characters, use relevant emojis, and sound knowledgeable but casual. Focus on market insights or trading observations."
+                },
+                {
+                    "role": "user",
+                    "content": f"Today's most called Solana tokens:\\n{context}\\n\\nWrite a brief, engaging comment about this trend:"
+                }
+            ],
+            max_tokens=50,
+            temperature=0.8
+        )
+        
+        comment = response.choices[0].message.content.strip()
+        logging.info(f"Generated AI comment: {comment}")
+        return comment
+        
+    except Exception as e:
+        logging.error(f"Error generating AI comment: {e}")
+        # Fallback przy błędzie
+        return f"🚀 ${top_tokens[0]['symbol']} is trending with {top_tokens[0]['filtered_calls']} calls! Market momentum building 📈"
+
+def is_comment_cycle():
+    """Sprawdza czy aktualna godzina to cykl komentarzy (co 4 godziny od 6 UTC)"""
+    current_hour = datetime.now(timezone.utc).hour
+    # Komentarze o: 6, 10, 14, 18, 22 UTC (co 4h)
+    comment_hours = [6, 10, 14, 18, 22]
+    return current_hour in comment_hours
 
 def main():
     logging.info("GitHub Action: Bot execution started.")
+    
+    # Random delay na start (3-7 minut) - symuluje ludzkie zachowanie
+    startup_delay = random.randint(180, 420)  # 3-7 minut
+    logging.info(f"Random startup delay: {startup_delay} seconds ({startup_delay//60} minutes)")
+    time.sleep(startup_delay)
 
     if not all([api_key, api_secret, access_token, access_token_secret]):
         logging.error("CRITICAL: One or more Twitter API keys are missing from environment variables. Exiting.")
@@ -119,8 +209,37 @@ def main():
 
     top_tokens = get_top_tokens()
     if not top_tokens:
-        logging.warning("Failed to fetch top tokens or no tokens returned. Skipping tweet.")
-        return
+        logging.warning("Failed to fetch top tokens or no tokens returned.")
+        
+        # Jeśli nie ma głównych danych, ale jest cykl komentarzy - wyślij fallback
+        if is_comment_cycle():
+            logging.info("No API data, but it's comment cycle. Sending fallback comment...")
+            fallback_comments = [
+                "🔍 Markets are quiet today - perfect time to research those hidden gems! 💎 #Solana #DeFi",
+                "📊 Low activity periods often precede the biggest moves. Stay ready! 🚀 #CryptoAnalysis", 
+                "🤔 When the calls are quiet, the smart money is accumulating... #SolanaGems",
+                "💡 Pro tip: Use quiet market periods to study patterns and prepare strategies! 📈"
+            ]
+            
+            try:
+                comment_delay = random.randint(300, 600)  # 5-10 minut
+                logging.info(f"Waiting {comment_delay} seconds before fallback comment...")
+                time.sleep(comment_delay)
+                
+                fallback_comment = random.choice(fallback_comments)
+                response_comment = client.create_tweet(text=fallback_comment)
+                comment_tweet_id = response_comment.data['id']
+                logging.info(f"Fallback comment sent successfully! Tweet ID: {comment_tweet_id}")
+                
+            except tweepy.TweepyException as e:
+                logging.error(f"Twitter API error sending fallback comment: {e}")
+            except Exception as e:
+                logging.error(f"Unexpected error sending fallback comment: {e}")
+        else:
+            current_hour = datetime.now(timezone.utc).hour
+            logging.info(f"No API data and not comment cycle (hour: {current_hour}). Nothing to do.")
+        
+        return  # Zakończ wykonanie jeśli nie ma danych
 
     # Przygotowanie i wysłanie głównego tweeta (tokeny 1-3)
     main_tweet_text = format_main_tweet(top_tokens[:3])
@@ -153,7 +272,9 @@ def main():
         logging.info(f"Main tweet sent successfully! Tweet ID: {main_tweet_id}")
 
         # Czekaj przed wysłaniem odpowiedzi
-        time.sleep(120)
+        wait_time = random.randint(180, 300)  # 3-5 minut losowo
+        logging.info(f"Waiting {wait_time} seconds before sending reply...")
+        time.sleep(wait_time)
 
         # Przygotowanie i wysłanie odpowiedzi (tokeny 4-5 + link)
         continuation_tokens = top_tokens[3:5]
@@ -185,6 +306,32 @@ def main():
         )
         reply_tweet_id = response_reply_tweet.data['id']
         logging.info(f"Reply tweet sent successfully! Tweet ID: {reply_tweet_id}")
+
+        # --- KOMENTARZ AI (po udanych głównych tweetach, jeśli to cykl co 4h) ---
+        if is_comment_cycle():
+            logging.info("Main tweets successful + comment cycle detected. Preparing AI comment...")
+            
+            # Poczekaj 5-10 minut po głównych tweetach
+            comment_delay = random.randint(300, 600)  # 5-10 minut
+            logging.info(f"Waiting {comment_delay} seconds ({comment_delay//60} minutes) before AI comment...")
+            time.sleep(comment_delay)
+            
+            try:
+                ai_comment = generate_ai_comment(top_tokens)
+                logging.info(f"Generated comment ({len(ai_comment)} chars): {ai_comment}")
+                
+                # Wyślij komentarz jako normalny tweet
+                response_comment = client.create_tweet(text=ai_comment)
+                comment_tweet_id = response_comment.data['id']
+                logging.info(f"AI comment sent successfully! Tweet ID: {comment_tweet_id}")
+                
+            except tweepy.TweepyException as e:
+                logging.error(f"Twitter API error sending AI comment: {e}")
+            except Exception as e:
+                logging.error(f"Unexpected error sending AI comment: {e}")
+        else:
+            current_hour = datetime.now(timezone.utc).hour
+            logging.info(f"Main tweets successful, but not comment cycle (hour: {current_hour}). No AI comment.")
 
     except tweepy.TooManyRequests as e:
         reset_time = int(e.response.headers.get('x-rate-limit-reset', 0))
