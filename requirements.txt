@@ -1,0 +1,14 @@
+# Twitter Bot Requirements
+tweepy>=4.14.0
+requests>=2.28.0
+
+# AI Comments (optional - bot works without this)
+openai>=1.0.0
+
+# Standard libraries (usually pre-installed)
+# datetime, timezone, timedelta - built-in
+# logging - built-in  
+# os - built-in
+# json - built-in
+# time - built-in
+# random - built-in 
