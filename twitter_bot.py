@@ -123,12 +123,12 @@ def format_reply_tweet(continuation_tokens):
 def generate_ai_comment(top_tokens):
     """Generuje losowy komentarz AI na temat top tokenów"""
     if not openai_api_key or not OPENAI_AVAILABLE or not openai_client:
-        # Fallback - predefiniowane komentarze
+        # Fallback - predefiniowane komentarze w stylu Monty
         fallback_comments = [
-            f"🔥 {top_tokens[0]['symbol']} leading with {top_tokens[0]['filtered_calls']} calls! The market speaks volumes 📊",
-            f"Interesting pattern: ${top_tokens[0]['symbol']} and ${top_tokens[1]['symbol']} dominating today's calls 🤔",
-            f"💡 Pro tip: When you see {top_tokens[0]['filtered_calls']} calls on ${top_tokens[0]['symbol']}, smart money is moving!",
-            f"🎯 ${top_tokens[0]['symbol']} with {top_tokens[0]['filtered_calls']} calls - that's what momentum looks like! #SolanaGems"
+            f"Follow-up: ${top_tokens[0]['symbol']} got {top_tokens[0]['filtered_calls']} calls - when this many degens agree, big brain move incoming 🧠",
+            f"Context behind the numbers: Solana whales whispering about ${top_tokens[0]['symbol']} and ${top_tokens[1]['symbol']} - data don't lie 👀", 
+            f"Alpha time: {top_tokens[0]['filtered_calls']} calls on ${top_tokens[0]['symbol']}? That's not luck, that's momentum. LFG! 🚀",
+            f"Pattern check: ${top_tokens[0]['symbol']} leading with {top_tokens[0]['filtered_calls']} calls - what's the story here? 🤔 #SolanaGems"
         ]
         return random.choice(fallback_comments)
     
@@ -142,16 +142,26 @@ def generate_ai_comment(top_tokens):
         
         context = "\\n".join(token_info)
         
+        # Różne style follow-up komentarzy
+        comment_styles = [
+            f"Just posted hourly top 5 Solana tokens. Latest 1h data:\\n{context}\\n\\nDrop a follow-up insight - different angle than the main post:",
+            f"Posted the numbers, now the context. These Solana tokens trending 1h:\\n{context}\\n\\nWhat's driving this momentum?",
+            f"Data dropped. Now the alpha. Top Solana calls this hour:\\n{context}\\n\\nShare a contrarian or deeper take:",
+            f"Posted the leaders, now the story. Recent 1h Solana action:\\n{context}\\n\\nWhat pattern do you see here?"
+        ]
+        
+        selected_prompt = random.choice(comment_styles)
+        
         response = openai_client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {
                     "role": "system", 
-                    "content": "You are a crypto analyst writing short, engaging Twitter comments about trending Solana tokens. Keep it under 200 characters, use relevant emojis, and sound knowledgeable but casual. Focus on market insights or trading observations."
+                    "content": "You are a sharp crypto analyst on Solana X/Twitter. Style: witty, punchy, crypto-native. Use degen slang sparingly (FOMO, LFG, rug alert, mooning, big brain move) but keep it respectful & insightful. Start with catchy hooks. Be confident but never arrogant. Max 200 chars. Think 'when whales whisper' vibes - engaging but data-driven. Each word counts."
                 },
                 {
                     "role": "user",
-                    "content": f"Today's most called Solana tokens:\\n{context}\\n\\nWrite a brief, engaging comment about this trend:"
+                    "content": selected_prompt
                 }
             ],
             max_tokens=50,
@@ -165,7 +175,7 @@ def generate_ai_comment(top_tokens):
     except Exception as e:
         logging.error(f"Error generating AI comment: {e}")
         # Fallback przy błędzie
-        return f"🚀 ${top_tokens[0]['symbol']} is trending with {top_tokens[0]['filtered_calls']} calls! Market momentum building 📈"
+        return f"🚀 ${top_tokens[0]['symbol']} getting calls with {top_tokens[0]['filtered_calls']} mentions - smart money moving? 👀"
 
 def is_comment_cycle():
     """Sprawdza czy aktualna godzina to cykl komentarzy (co 4 godziny od 6 UTC)"""
@@ -215,10 +225,10 @@ def main():
         if is_comment_cycle():
             logging.info("No API data, but it's comment cycle. Sending fallback comment...")
             fallback_comments = [
-                "🔍 Markets are quiet today - perfect time to research those hidden gems! 💎 #Solana #DeFi",
-                "📊 Low activity periods often precede the biggest moves. Stay ready! 🚀 #CryptoAnalysis", 
-                "🤔 When the calls are quiet, the smart money is accumulating... #SolanaGems",
-                "💡 Pro tip: Use quiet market periods to study patterns and prepare strategies! 📈"
+                "🔍 Markets quiet today? Perfect time to research those hidden gems! Diamond hands always win 💎 #Solana #DeFi",
+                "📊 Low activity = big moves incoming. When degens sleep, smart money accumulates 👀 #CryptoAnalysis", 
+                "🤔 Calls are quiet but Solana never sleeps - something brewing in the shadows? 👻 #SolanaGems",
+                "💡 Pro tip: Quiet periods = research time. Next pump starts when nobody's watching 🚀 #DeFi"
             ]
             
             try:
