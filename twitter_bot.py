@@ -123,31 +123,27 @@ def format_reply_tweet(continuation_tokens):
 def generate_ai_comment(top_tokens):
     """Generuje losowy komentarz AI na temat top tokenów"""
     if not openai_api_key or not OPENAI_AVAILABLE or not openai_client:
-        # Fallback - predefiniowane komentarze w stylu Monty
+        # Fallback - predefiniowane komentarze w stylu Monty - focus na #1
         fallback_comments = [
-            f"Follow-up: ${top_tokens[0]['symbol']} got {top_tokens[0]['filtered_calls']} calls - when this many degens agree, big brain move incoming 🧠",
-            f"Context behind the numbers: Solana whales whispering about ${top_tokens[0]['symbol']} and ${top_tokens[1]['symbol']} - data don't lie 👀", 
-            f"Alpha time: {top_tokens[0]['filtered_calls']} calls on ${top_tokens[0]['symbol']}? That's not luck, that's momentum. LFG! 🚀",
-            f"Pattern check: ${top_tokens[0]['symbol']} leading with {top_tokens[0]['filtered_calls']} calls - what's the story here? 🤔 #SolanaGems"
+            f"Follow-up on our #1: ${top_tokens[0]['symbol']} got {top_tokens[0]['filtered_calls']} calls - when this many degens agree, big brain move incoming 🧠",
+            f"Context on today's leader: ${top_tokens[0]['symbol']} dominating with {top_tokens[0]['filtered_calls']} calls - smart money knows something 👀", 
+            f"Alpha on our top performer: {top_tokens[0]['filtered_calls']} calls on ${top_tokens[0]['symbol']}? That's not luck, that's momentum. LFG! 🚀",
+            f"Story behind #1: ${top_tokens[0]['symbol']} leading with {top_tokens[0]['filtered_calls']} calls - what's the thesis here? 🤔 #SolanaGems"
         ]
         return random.choice(fallback_comments)
     
     try:
-        # Przygotuj kontekst dla AI
-        token_info = []
-        for i, token in enumerate(top_tokens[:3]):
-            symbol = token.get('symbol', 'Unknown')
-            calls = token.get('filtered_calls', 0)
-            token_info.append(f"{i+1}. ${symbol} ({calls} calls)")
+        # Przygotuj kontekst dla AI - tylko TOP 1 token
+        top_token = top_tokens[0]
+        symbol = top_token.get('symbol', 'Unknown')
+        calls = top_token.get('filtered_calls', 0)
         
-        context = "\\n".join(token_info)
-        
-        # Różne style follow-up komentarzy
+        # Różne style follow-up komentarzy - focus na #1
         comment_styles = [
-            f"Just posted hourly top 5 Solana tokens. Latest 1h data:\\n{context}\\n\\nDrop a follow-up insight - different angle than the main post:",
-            f"Posted the numbers, now the context. These Solana tokens trending 1h:\\n{context}\\n\\nWhat's driving this momentum?",
-            f"Data dropped. Now the alpha. Top Solana calls this hour:\\n{context}\\n\\nShare a contrarian or deeper take:",
-            f"Posted the leaders, now the story. Recent 1h Solana action:\\n{context}\\n\\nWhat pattern do you see here?"
+            f"Just posted hourly top 5. #1 leader: ${symbol} ({calls} calls)\\n\\nDrop a follow-up insight on this top performer:",
+            f"Posted the numbers, now the context. Today's #1: ${symbol} with {calls} calls\\n\\nWhat's driving this leader?",
+            f"Data dropped. Now the alpha. Top performer: ${symbol} ({calls} calls)\\n\\nShare your take on this winner:",
+            f"Posted the leaders, now the story. ${symbol} dominates with {calls} calls\\n\\nWhat pattern do you see here?"
         ]
         
         selected_prompt = random.choice(comment_styles)
@@ -174,8 +170,8 @@ def generate_ai_comment(top_tokens):
         
     except Exception as e:
         logging.error(f"Error generating AI comment: {e}")
-        # Fallback przy błędzie
-        return f"🚀 ${top_tokens[0]['symbol']} getting calls with {top_tokens[0]['filtered_calls']} mentions - smart money moving? 👀"
+        # Fallback przy błędzie - focus na #1
+        return f"🚀 Today's #1: ${top_tokens[0]['symbol']} with {top_tokens[0]['filtered_calls']} calls - leader for a reason 👀"
 
 def is_comment_cycle():
     """Sprawdza czy aktualna godzina to cykl komentarzy (co 4 godziny od 6 UTC)"""
